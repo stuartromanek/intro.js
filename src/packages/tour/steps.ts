@@ -24,6 +24,7 @@ export type TourStep = {
   tooltipClass?: string;
   highlightClass?: string;
   element?: Element | HTMLElement | string | null;
+  elementSelector?: string;
   position: TooltipPosition;
   scrollTo: ScrollTo;
   disableInteraction?: boolean;
@@ -100,6 +101,8 @@ export const fetchSteps = (tour: Tour) => {
 
       //use querySelector function only when developer used CSS selector
       if (typeof step.element === "string") {
+        //store the selector string for later re-querying
+        step.elementSelector = step.element;
         //grab the element with given selector from the page
         step.element = queryElement(step.element) || undefined;
       }

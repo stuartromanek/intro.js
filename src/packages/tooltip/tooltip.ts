@@ -318,6 +318,8 @@ export type TooltipProps = {
   onClick?: (e: any) => void;
   className?: string;
   text: string;
+  // Optional: if provided, use this to get the current element reactively
+  getElement?: () => HTMLElement | null;
 };
 
 export const Tooltip = (
@@ -336,6 +338,7 @@ export const Tooltip = (
     autoPosition = true,
     text,
     onClick,
+    getElement,
   }: TooltipProps,
   children?: ChildDom[]
 ) => {
@@ -360,33 +363,65 @@ export const Tooltip = (
     () => targetOffset.val!.top + tooltipHeight.val! > windowSize.val!.height
   );
 
+  // Always update targetOffset when we have a valid element
+  // This ensures targetOffset is set before auto-position calculation runs
+  dom.derive(() => {
+    // Use getElement if provided to get the current element, otherwise use the static element prop
+    const currentElement = getElement ? getElement() : element;
+    if (currentElement) {
+      targetOffset.val = getOffset(currentElement);
+    }
+  });
+
   dom.derive(() => {
     // set the new windowSize and targetOffset if the refreshes signal changes
     if (refreshes.val !== undefined) {
       windowSize.val = getWindowSize();
-      targetOffset.val = getOffset(element);
+      // Use getElement if provided to get the current element, otherwise use the static element prop
+      const currentElement = getElement ? getElement() : element;
+      if (currentElement) {
+        targetOffset.val = getOffset(currentElement);
+      }
     }
   });
 
   // auto-align tooltip based on position precedence and target offset
   dom.derive(() => {
-    if (
+    // Use getElement if provided to get the current element, otherwise use the static element prop
+    const currentElement = getElement ? getElement() : element;
+    // Check if we have a valid element (not null and not the floating element)
+    const isFloatingElement = currentElement?.classList?.contains("introjsFloatingElement");
+    const hasValidElement = !!currentElement && !isFloatingElement;
+    
+    // Allow auto-position if we have a valid element and targetOffset, even if initialPosition was "floating"
+    // This handles the case where element was re-queried and found after being set to floating
+    // BUT: if the element is the floating element, always use "floating" position (legitimate no-element step)
+    const hasTargetOffset = !!targetOffset.val;
+    const shouldCalculatePosition = 
+      !isFloatingElement && // Never calculate position for floating element (legitimate no-element step)
       position.val !== undefined &&
-      initialPosition !== "floating" &&
       autoPosition &&
       tooltipWidth.val &&
       tooltipHeight.val &&
-      targetOffset.val &&
-      windowSize.val
-    ) {
-      position.val = determineAutoPosition(
+      hasTargetOffset &&
+      windowSize.val &&
+      (initialPosition !== "floating" || (hasValidElement && hasTargetOffset));
+
+    if (shouldCalculatePosition && targetOffset.val && tooltipWidth.val && tooltipHeight.val && windowSize.val) {
+      // If initialPosition was "floating" but we have a valid element, use default position for calculation
+      const positionForCalculation = initialPosition === "floating" && hasValidElement
+        ? (positionPrecedence[0] || "bottom")
+        : initialPosition;
+      
+      const calculatedPosition = determineAutoPosition(
         positionPrecedence,
         targetOffset.val,
         tooltipWidth.val,
         tooltipHeight.val,
-        initialPosition,
+        positionForCalculation,
         windowSize.val
       );
+      position.val = calculatedPosition;
     }
   });
 

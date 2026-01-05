@@ -522,6 +522,7 @@ export const TourTooltip = ({
     {
       ...props,
       element: step.element as HTMLElement,
+      getElement: () => step.element as HTMLElement | null,
       hintMode: false,
       position,
       text: title || text,
