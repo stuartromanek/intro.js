@@ -85,6 +85,15 @@ export class Tour implements Package<TourOptions> {
    * @param step step number
    */
   async goToStep(step: number) {
+    // Call onComplete callback for the current step before jumping to a different step
+    const currentStepIndex = this.getCurrentStep();
+    if (currentStepIndex !== undefined) {
+      const currentStep = this.getStep(currentStepIndex);
+      if (currentStep?.onComplete) {
+        await currentStep.onComplete();
+      }
+    }
+
     // step - 2 because steps starts from zero index and nextStep() increments the step
     this.setCurrentStep(step - 2);
     await nextStep(this);
@@ -96,6 +105,15 @@ export class Tour implements Package<TourOptions> {
    * @param stepNumber [data-step] value of the step
    */
   async goToStepNumber(stepNumber: number) {
+    // Call onComplete callback for the current step before jumping to a different step
+    const currentStepIndex = this.getCurrentStep();
+    if (currentStepIndex !== undefined) {
+      const currentStep = this.getStep(currentStepIndex);
+      if (currentStep?.onComplete) {
+        await currentStep.onComplete();
+      }
+    }
+
     for (let i = 0; i < this._steps.length; i++) {
       const item = this._steps[i];
 

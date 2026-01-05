@@ -97,6 +97,15 @@ export const TourRoot = ({ tour }: TourRootProps) => {
               (e.target as HTMLElement).className
             )
           ) {
+            // Call onComplete callback for the current (last) step before completing the tour
+            const currentStepIndex = tour.getCurrentStep();
+            if (currentStepIndex !== undefined) {
+              const currentStep = tour.getStep(currentStepIndex);
+              if (currentStep?.onComplete) {
+                await currentStep.onComplete();
+              }
+            }
+
             await tour
               .callback("complete")
               ?.call(tour, tour.getCurrentStep(), "done");

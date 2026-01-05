@@ -27,6 +27,7 @@ export type TourStep = {
   position: TooltipPosition;
   scrollTo: ScrollTo;
   disableInteraction?: boolean;
+  onComplete?: () => Promise<void> | void;
 };
 
 /**
@@ -39,6 +40,15 @@ export async function nextStep(tour: Tour) {
     await tour.callback("complete")?.call(tour, tour.getCurrentStep(), "end");
     await tour.exit();
     return false;
+  }
+
+  // Call onComplete callback for the current step before moving to the next step
+  const currentStepIndex = tour.getCurrentStep();
+  if (currentStepIndex !== undefined) {
+    const currentStep = tour.getStep(currentStepIndex);
+    if (currentStep?.onComplete) {
+      await currentStep.onComplete();
+    }
   }
 
   await tour.incrementCurrentStep();
