@@ -72,6 +72,16 @@ export async function previousStep(tour: Tour) {
     return false;
   }
 
+  // Call onComplete callback from the step before the previous one to 'set up' the previous state
+  // (e.g., if on step 2, run step 0's onComplete to set up step 1)
+  const setupStepIndex = currentStep - 2;
+  if (setupStepIndex >= 0) {
+    const setupStep = tour.getStep(setupStepIndex);
+    if (setupStep?.onComplete) {
+      await setupStep.onComplete();
+    }
+  }
+
   await tour.decrementCurrentStep();
 
   const newStep = tour.getCurrentStep()!;
