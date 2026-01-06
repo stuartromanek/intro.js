@@ -92,6 +92,7 @@
     "**/*.d.ts",
     "themes/*",
     "minified/*",
+    "dist/*",
     "!tests/**/*"
   ],
   "license": "AGPL-3.0",
