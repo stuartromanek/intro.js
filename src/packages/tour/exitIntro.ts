@@ -1,5 +1,6 @@
 import { removeShowElement } from "./showElement";
 import { Tour } from "./tour";
+import { removeClass } from "../../util/className";
 
 /**
  * Exit from intro
@@ -21,6 +22,9 @@ export default async function exitIntro(
   // skip this check if `force` parameter is `true`
   // otherwise, if `onBeforEexit` returned `false`, don't exit the intro
   if (!force && continueExit === false) return false;
+
+  // Remove body class to indicate tour is no longer active
+  removeClass(document.body, "introjs-tour-active");
 
   removeShowElement();
 

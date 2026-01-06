@@ -1,6 +1,7 @@
 import { nextStep } from "./steps";
 import { fetchSteps } from "./steps";
 import { Tour } from "./tour";
+import { addClass } from "../../util/className";
 
 /**
  * Initiate a new tour the page
@@ -31,6 +32,9 @@ export const start = async (tour: Tour): Promise<Boolean> => {
 
   //then, start the show
   await nextStep(tour);
+
+  // Add body class to indicate tour is active
+  addClass(document.body, "introjs-tour-active");
 
   return true;
 };

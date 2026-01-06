@@ -29,6 +29,7 @@ export type TourStep = {
   scrollTo: ScrollTo;
   disableInteraction?: boolean;
   onComplete?: () => Promise<void> | void;
+  skipIf?: () => boolean | Promise<boolean>;
 };
 
 /**
@@ -37,6 +38,8 @@ export type TourStep = {
  * @api private
  */
 export async function nextStep(tour: Tour) {
+  const initialStepIndex = tour.getCurrentStep();
+  
   if (tour.isEnd()) {
     await tour.callback("complete")?.call(tour, tour.getCurrentStep(), "end");
     await tour.exit();
@@ -44,19 +47,125 @@ export async function nextStep(tour: Tour) {
   }
 
   // Call onComplete callback for the current step before moving to the next step
+  // Only call onComplete if we've actually shown the step (not if it was skipped)
+  // We detect if a step was skipped by checking if the index didn't change after incrementing
   const currentStepIndex = tour.getCurrentStep();
-  if (currentStepIndex !== undefined) {
+  let stepWasShown = true; // Track if the current step was actually shown
+  
+  await tour.incrementCurrentStep();
+  let targetStepIndex = tour.getCurrentStep();
+
+  // Check if increment failed (step index didn't change) - this means we're at the last step
+  const incrementFailed = targetStepIndex === initialStepIndex;
+
+  // Check if we've reached the end after incrementing
+  if (tour.isEnd() || incrementFailed) {
+    // Call onComplete for the last step if it was shown
+    if (currentStepIndex !== undefined && currentStepIndex !== targetStepIndex && stepWasShown) {
+      const currentStep = tour.getStep(currentStepIndex);
+      if (currentStep?.onComplete) {
+        await currentStep.onComplete();
+      }
+    }
+    await tour.callback("complete")?.call(tour, tour.getCurrentStep(), "end");
+    await tour.exit();
+    return false;
+  }
+
+  // Safety check: ensure targetStep exists before checking skipIf
+  if (targetStepIndex === undefined || targetStepIndex >= tour.getSteps().length) {
+    await tour.callback("complete")?.call(tour, targetStepIndex, "end");
+    await tour.exit();
+    return false;
+  }
+
+  let targetStep = tour.getStep(targetStepIndex);
+  
+  // Safety check: ensure targetStep exists
+  if (!targetStep) {
+    await tour.callback("complete")?.call(tour, targetStepIndex, "end");
+    await tour.exit();
+    return false;
+  }
+  
+  // Check if this step should be skipped BEFORE calling onComplete or showing it
+  if (targetStep.skipIf) {
+    const shouldSkip = await targetStep.skipIf();
+    if (shouldSkip) {
+      // If we're trying to skip the last step, just end the tour
+      if (targetStepIndex >= tour.getSteps().length - 1) {
+        // Call onComplete for the previous step if it was shown
+        if (currentStepIndex !== undefined && currentStepIndex !== targetStepIndex && stepWasShown) {
+          const currentStep = tour.getStep(currentStepIndex);
+          if (currentStep?.onComplete) {
+            await currentStep.onComplete();
+          }
+        }
+        await tour.callback("complete")?.call(tour, targetStepIndex, "end");
+        await tour.exit();
+        return false;
+      }
+      
+      // Skip this step and continue to the next one
+      // Keep incrementing until we find a step that shouldn't be skipped or reach the end
+      let nextStepIndex = targetStepIndex + 1;
+      while (nextStepIndex < tour.getSteps().length) {
+        const nextStep = tour.getStep(nextStepIndex);
+        if (!nextStep) break;
+        
+        if (nextStep.skipIf) {
+          const shouldSkipNext = await nextStep.skipIf();
+          if (!shouldSkipNext) {
+            // Found a step that shouldn't be skipped
+            break;
+          }
+        } else {
+          // Found a step without skipIf, so we'll show it
+          break;
+        }
+        
+        nextStepIndex++;
+      }
+      
+      // Check if we've run out of steps
+      if (nextStepIndex >= tour.getSteps().length) {
+        // Call onComplete for the previous step if it was shown
+        if (currentStepIndex !== undefined && currentStepIndex !== targetStepIndex && stepWasShown) {
+          const currentStep = tour.getStep(currentStepIndex);
+          if (currentStep?.onComplete) {
+            await currentStep.onComplete();
+          }
+        }
+        await tour.callback("complete")?.call(tour, targetStepIndex, "end");
+        await tour.exit();
+        return false;
+      }
+      
+      // Set the step to the next non-skipped step and continue to show it
+      await tour.setCurrentStep(nextStepIndex);
+      // Update targetStepIndex to the next non-skipped step
+      targetStepIndex = nextStepIndex;
+      const updatedStep = tour.getStep(targetStepIndex);
+      if (!updatedStep) {
+        await tour.callback("complete")?.call(tour, targetStepIndex, "end");
+        await tour.exit();
+        return false;
+      }
+      // Continue to the common code path below to show the step
+      targetStep = updatedStep;
+    }
+  }
+  
+  // Common code path: call onComplete for the previous step and show the current step
+  // Only call onComplete for the previous step if it was actually shown (not skipped)
+  if (currentStepIndex !== undefined && currentStepIndex !== targetStepIndex && stepWasShown) {
     const currentStep = tour.getStep(currentStepIndex);
     if (currentStep?.onComplete) {
       await currentStep.onComplete();
     }
   }
-
-  await tour.incrementCurrentStep();
-
-  const currentStep = tour.getCurrentStep();
-  const nextStep = tour.getStep(currentStep!);
-  await showElement(tour, nextStep);
+  
+  await showElement(tour, targetStep);
 
   return true;
 }
@@ -72,9 +181,40 @@ export async function previousStep(tour: Tour) {
     return false;
   }
 
-  // Call onComplete callback from the step before the previous one to 'set up' the previous state
-  // (e.g., if on step 2, run step 0's onComplete to set up step 1)
-  const setupStepIndex = currentStep - 2;
+  // Find the first eligible (non-skipped) step going backwards
+  let targetStepIndex = currentStep - 1;
+  
+  // Keep going back until we find a step that shouldn't be skipped
+  while (targetStepIndex >= 0) {
+    const candidateStep = tour.getStep(targetStepIndex);
+    if (!candidateStep) {
+      // Step doesn't exist, go back further
+      targetStepIndex--;
+      continue;
+    }
+    
+    // Check if this step should be skipped
+    if (candidateStep.skipIf) {
+      const shouldSkip = await candidateStep.skipIf();
+      if (shouldSkip) {
+        // This step should be skipped, continue going back
+        targetStepIndex--;
+        continue;
+      }
+    }
+    
+    // Found an eligible step that shouldn't be skipped
+    break;
+  }
+  
+  // If we went past the beginning, there's no eligible step to go back to
+  if (targetStepIndex < 0) {
+    return false;
+  }
+  
+  // Call onComplete callback from the step before the target step to 'set up' the target state
+  // (e.g., if going to step 1, run step 0's onComplete to set up step 1)
+  const setupStepIndex = targetStepIndex - 1;
   if (setupStepIndex >= 0) {
     const setupStep = tour.getStep(setupStepIndex);
     if (setupStep?.onComplete) {
@@ -82,11 +222,15 @@ export async function previousStep(tour: Tour) {
     }
   }
 
-  await tour.decrementCurrentStep();
+  // Set the current step to the target step
+  await tour.setCurrentStep(targetStepIndex);
 
-  const newStep = tour.getCurrentStep()!;
-  const prevStep = tour.getStep(newStep);
-  await showElement(tour, prevStep);
+  const targetStep = tour.getStep(targetStepIndex);
+  if (!targetStep) {
+    return false;
+  }
+  
+  await showElement(tour, targetStep);
 
   return true;
 }
