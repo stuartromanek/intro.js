@@ -17,9 +17,9 @@
     "type": "git",
     "url": "https://github.com/stuartromanek/intro.js"
   },
-  "main": "dist/intro.js",
-  "module": "dist/intro.module.js",
-  "types": "dist/src/index.d.ts",
+  "main": "dist/dist/intro.js",
+  "module": "dist/dist/intro.module.js",
+  "types": "dist/dist/src/index.d.ts",
   "scripts": {
     "prettier": "prettier --write '(src|tests)/**/*.(js|ts|json|html)' '!tests/cypress/setup/dist'",
     "cypress:updatesnapshots": "start-server-and-test dev http://localhost:10001/dist/intro.js 'docker run -it -v $PWD:/e2e -w /e2e --entrypoint=cypress cypress/included:cypress-13.17.0-node-22.13.0-chrome-131.0.6778.264-1-ff-134.0-edge-131.0.2903.112-1 run --env visualRegressionType=base'",
