@@ -11,5 +11,6 @@ export type HintItem = {
     hintAnimation?: boolean;
     hintPosition: HintPosition;
     isActive?: State<boolean>;
+    id?: string | number;
 };
 export declare const fetchHintItems: (hint: Hint) => boolean | undefined;

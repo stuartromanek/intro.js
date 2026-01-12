@@ -7,6 +7,7 @@ import {
   dataHintPositionAttribute,
   dataTooltipClassAttribute,
   dataHintAnimationAttribute,
+  dataHintIdAttribute,
 } from "./dataAttributes";
 import { State } from "../dom";
 
@@ -32,6 +33,7 @@ export type HintItem = {
   hintAnimation?: boolean;
   hintPosition: HintPosition;
   isActive?: State<boolean>;
+  id?: string | number;
 };
 
 export const fetchHintItems = (hint: Hint) => {
@@ -80,6 +82,8 @@ export const fetchHintItems = (hint: Hint) => {
       const hintText = element.getAttribute(dataHintAttribute);
       if (!hintText) return;
 
+      const hintId = element.getAttribute(dataHintIdAttribute);
+
       hint.addHint({
         element: element,
         hint: hintText,
@@ -90,6 +94,7 @@ export const fetchHintItems = (hint: Hint) => {
           element.getAttribute(dataTooltipClassAttribute) || undefined,
         position: (element.getAttribute("data-position") ||
           hint.getOption("tooltipPosition")) as TooltipPosition,
+        id: hintId || undefined,
       });
     }
   }

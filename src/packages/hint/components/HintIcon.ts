@@ -9,7 +9,7 @@ import {
   hintPulseClassName,
 } from "../className";
 import { HintItem, HintPosition } from "../hintItem";
-import { dataStepAttribute } from "../dataAttributes";
+import { dataStepAttribute, dataHintIdAttribute } from "../dataAttributes";
 import { alignHintPosition } from "../position";
 
 const { a, div } = dom.tags;
@@ -48,18 +48,21 @@ export const HintIcon = ({
   onClick,
   refreshesSignal,
 }: HintProps) => {
-  const hintElement = a(
-    {
-      [dataStepAttribute]: index.toString(),
-      className: () => className(hintItem),
-      role: "button",
-      tabindex: 0,
-      "aria-label": hintItem?.hint,
-      onclick: onClick,
-    },
-    HintDot(),
-    HintPulse()
-  );
+  const attributes: any = {
+    [dataStepAttribute]: index.toString(),
+    className: () => className(hintItem),
+    role: "button",
+    tabindex: 0,
+    "aria-label": hintItem?.hint,
+    onclick: onClick,
+  };
+
+  // Add data-hint-id attribute if id is provided
+  if (hintItem.id !== undefined) {
+    attributes[dataHintIdAttribute] = hintItem.id.toString();
+  }
+
+  const hintElement = a(attributes, HintDot(), HintPulse());
 
   dom.derive(() => {
     if (refreshesSignal.val === undefined) return;
